@@ -1,21 +1,30 @@
 import argparse
-import os, sys
+import os
+import sys
 import random
 
 import numpy as np
 from tqdm import tqdm
 
 from NLP_classifier.Utils import model_utils, features_utils
-from NLP_classifier.Utils.argparse_utils import LoadFromFile, args_to_file
+from NLP_classifier.Utils.argparse_utils import LoadFromFile, args_to_file, check_positive
 from NLP_classifier.main import Main
 
 parser = argparse.ArgumentParser(description="Text classifier")
 parser.add_argument(
     "-tr", "--train_path", help="Path to the train file", required=False
 )
-parser.add_argument("-d", "--dev_path", help="Path to the dev file", required=False)
-parser.add_argument("-tt", "--test_path", help="Path to the test file", required=False)
-parser.add_argument("-n", "--normalize", help="Langage to normalize", required=False)
+parser.add_argument("-d", "--dev_path",
+                    help="Path to the dev file", required=False)
+parser.add_argument("-tt", "--test_path",
+                    help="Path to the test file", required=False)
+parser.add_argument("-n", "--normalize",
+                    help="Langage to normalize", required=False)
+
+
+parser.add_argument("-cf", "--cross_fold", type=check_positive,
+                    help="cross fold number to use", required=False)
+
 parser.add_argument(
     "-f",
     "--features",
@@ -66,7 +75,8 @@ if __name__ == "__main__":
     for i, features_creation in enumerate(tqdm(args.features_creation)):
         features_to_create = " ".join(features_creation)
         output = os.path.join(args.output, features_to_create)
-        print(f"{i + 1}/{len(args.features_creation)}: Running for features {features_to_create}")
+        print(
+            f"{i + 1}/{len(args.features_creation)}: Running for features {features_to_create}")
         fm = Main(
             train_path=args.train_path,
             dev_path=args.dev_path,
@@ -77,6 +87,7 @@ if __name__ == "__main__":
             model_names=args.model_names,
             words_occurence_features=args.words_occurence_features,
             chars_occurence_features=args.chars_occurence_features,
+            cross_fold=args.cross_fold,
             output=output,
             result=args.output,
         )

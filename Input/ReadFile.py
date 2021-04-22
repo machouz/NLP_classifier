@@ -22,9 +22,7 @@ def create_file(path, new_path, num=2):
 
 
 def read_file(path, names=["id", "text", "label"]):
-    data = pd.read_table(
-        path, header=0, names=names, sep="\t", quoting=csv.QUOTE_NONE, encoding="utf-8"
-    ).applymap(str)
+    data = pd.read_table(path, header=0, names=names, sep="\t", quoting=csv.QUOTE_NONE, encoding="utf-8").applymap(str)
 
     return data
 

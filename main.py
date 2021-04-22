@@ -28,20 +28,23 @@ class Main:
         words_occurence_features=None,
         chars_occurence_features=None,
         normalize=False,
-        verbose=False
+        verbose=False,
+        cross_fold=False,
     ):
 
         self.paths = CreateEnv.create(output, model_names, result)
         self.train = ReadFile.read_file(train_path)
-
+        self.cross_fold = cross_fold
         self.verbose = verbose
 
-        if not dev_path:
-            self.train, self.dev = train_test_split(self.train, test_size=0.2)
-        else:
+        if dev_path:
             self.dev = ReadFile.read_file(dev_path)
+        elif not cross_fold:
+            self.train, self.dev = train_test_split(self.train, test_size=0.2)
+
         self.test = (
-            ReadFile.read_file(test_path, names=["id", "text"]) if test_path else None
+            ReadFile.read_file(test_path, names=[
+                               "id", "text"]) if test_path else None
         )
         if normalize:
             self.normalization = normalize_language[normalize]
@@ -67,8 +70,10 @@ class Main:
 
         self.features = features if features else []
         self.features_functions = [
-            lambda x: ExtractFeatures.word_gram(x, self.paths["word_features_path"]),
-            lambda x: ExtractFeatures.char_gram(x, self.paths["char_features_path"]),
+            lambda x: ExtractFeatures.word_gram(
+                x, self.paths["word_features_path"]),
+            lambda x: ExtractFeatures.char_gram(
+                x, self.paths["char_features_path"]),
             *features_utils.get_func(self.features),
         ]
 
@@ -83,16 +88,19 @@ class Main:
                 )
 
             word_features_list += words_occurence_features
-        utils.list_to_file(self.paths["word_features_path"], sorted(word_features_list))
+        utils.list_to_file(
+            self.paths["word_features_path"], sorted(word_features_list))
 
         char_features_list = self.char_feature_creation(self.train.text)
         if self.chars_occurence_features:
             chars_occurence_features = []
             for path in self.chars_occurence_features:
-                chars_occurence_features.extend(CreateFeatures.get_occurences(path))
+                chars_occurence_features.extend(
+                    CreateFeatures.get_occurences(path))
 
             char_features_list += chars_occurence_features
-        utils.list_to_file(self.paths["char_features_path"], sorted(char_features_list))
+        utils.list_to_file(
+            self.paths["char_features_path"], sorted(char_features_list))
 
         all_features = word_features_list + char_features_list + self.features
         Globals.FEATURES = len(all_features)
@@ -182,28 +190,41 @@ class Main:
 
         self.create_features_labels()
         self.extract_convert_train_feature()
-        self.extract_convert_dev_labels()
+        if not self.cross_fold:
+            self.extract_convert_dev_labels()
+
         if self.test is not None:
             self.extract_convert_test()
 
         for i, model in enumerate(self.models):
             print(model)
+            f1 = -1
             # Use features to train
-            Model.train_model(
-                model=self.models[i],
-                feature_vecs_file=self.paths["train_vec_extracted_features"],
-                label_file=self.paths["train_label"],
-                model_path=self.paths["models"][i],
-            )
-            if self.verbose:
-                print("Model trained")
+            if self.cross_fold:
+                _, f1 = Model.cross_train_eval(
+                    model=self.models[i],
+                    feature_vecs_file=self.paths["train_vec_extracted_features"],
+                    label_file=self.paths["train_label"],
+                    model_path=self.paths["models"][i],
+                    cross_fold=self.cross_fold
+                )
 
-            # Eval
-            f1 = Model.eval_model(
-                model_path=self.paths["models"][i],
-                feature_vecs_file=self.paths["dev_vec_extracted_features"],
-                label_file=self.paths["dev_label"],
-            )
+            else:
+                Model.train_model(
+                    model=self.models[i],
+                    feature_vecs_file=self.paths["train_vec_extracted_features"],
+                    label_file=self.paths["train_label"],
+                    model_path=self.paths["models"][i],
+                )
+                if self.verbose:
+                    print("Model trained")
+
+                # Eval
+                f1 = Model.eval_model(
+                    model_path=self.paths["models"][i],
+                    feature_vecs_file=self.paths["dev_vec_extracted_features"],
+                    label_file=self.paths["dev_label"],
+                )
 
             SaveResult.toCSV(
                 self.model_names[i],
@@ -226,4 +247,3 @@ class Main:
                     sep=",",
                 )
                 zipFile(self.paths["test_predictions"][i])
-
